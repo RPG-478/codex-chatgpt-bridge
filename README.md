@@ -5,9 +5,11 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D22-339933)](./package.json)
 [![Adapter](https://img.shields.io/badge/adapter-Playwright-2EAD33)](#adapters)
 
-**Languages:** English | [日本語](./README.ja.md)
+**Languages:** English | [Japanese](./README.ja.md)
 
-Experimental alpha bridge for letting Codex delegate compact tasks to ChatGPT Web.
+A local experimental bridge that lets Codex ask ChatGPT Web for compact second opinions.
+
+Codex stays the executor. ChatGPT stays the advisor. The bridge only moves small structured delegation packets between them.
 
 ```text
 Codex -> cgpt CLI -> local browser bridge -> ChatGPT Project -> structured response -> Codex
@@ -23,6 +25,8 @@ It is not affiliated with, endorsed by, or supported by OpenAI. ChatGPT Web auto
 
 This project automates ChatGPT Web through a logged-in browser session. Before using or publishing derivatives, review the terms that apply to your ChatGPT account and use case. OpenAI's terms include restrictions around automated or programmatic extraction of Output.
 
+This tool is not intended for scraping, bulk extraction, dataset generation, account sharing, or bypassing API access.
+
 Recommended guardrails:
 
 | Area | Recommendation |
@@ -35,7 +39,9 @@ Recommended guardrails:
 
 ## Why
 
-Codex is strong at local code work: reading files, editing, running commands, and verifying changes. Humans often use ChatGPT for planning, research, critique, and summarization. This bridge explores a middle path: Codex sends a small delegation packet to ChatGPT and only reads back a short structured result.
+Codex is strong at acting on the local machine: reading files, editing, running commands, and verifying changes. ChatGPT is often useful as a thinking partner for planning, research, critique, and summarization. This bridge explores a middle path: Codex sends a small delegation packet to ChatGPT and only reads back a short structured result.
+
+The goal is to reduce Codex context usage for compact second opinions without giving ChatGPT control over your machine.
 
 ## Features
 
@@ -47,6 +53,7 @@ Codex is strong at local code work: reading files, editing, running commands, an
 | Project instructions template | Implemented |
 | Structured response validation | Implemented |
 | MCP server wrapper | Implemented |
+| Local doctor checks | Implemented |
 | Chrome extension adapter | Planned |
 
 ## Install
@@ -143,6 +150,22 @@ Read a response:
 ```powershell
 node .\dist\cli.js show --job <job-id>
 ```
+
+## Doctor
+
+Run local checks without sending a prompt to ChatGPT:
+
+```powershell
+node .\dist\cli.js doctor
+```
+
+Run browser and Project reachability checks:
+
+```powershell
+node .\dist\cli.js doctor --adapter playwright
+```
+
+The Playwright doctor opens ChatGPT with the configured browser profile, verifies that the prompt editor is reachable, and checks the configured Project target when one is set. It does not submit a delegation prompt.
 
 ## Modes
 
@@ -250,7 +273,6 @@ npm test
 
 ## Roadmap
 
-- MCP server wrapper for direct Codex tool use.
 - Chrome extension adapter for more stable DOM integration.
 - Project membership smoke test after each delegation.
 - Retry-on-schema-failure with a repair prompt.

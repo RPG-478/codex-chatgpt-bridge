@@ -126,6 +126,20 @@ export async function debugSubmitPrompt(prompt: string, options: PlaywrightOptio
   }
 }
 
+export async function checkChatGptReady(options: PlaywrightOptions = {}): Promise<{ url: string; title: string }> {
+  await ensureStateDirs();
+  const context = await launchChatGptContext(options);
+  try {
+    const page = await openChatGpt(context, options);
+    return {
+      url: page.url(),
+      title: await page.title().catch(() => "")
+    };
+  } finally {
+    await context.close();
+  }
+}
+
 async function persistJob(job: Job): Promise<void> {
   await writeJson(path.join(jobsDir, `${job.id}.json`), job);
   await writeText(path.join(jobsDir, `${job.id}.prompt.md`), job.prompt);

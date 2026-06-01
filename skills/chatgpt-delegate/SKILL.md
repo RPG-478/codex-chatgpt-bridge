@@ -22,6 +22,7 @@ Do not delegate:
 
 - Secrets, private tokens, credentials, or sensitive user data.
 - Full repositories, large file dumps, or unfiltered logs.
+- Scraping, bulk extraction, dataset generation, account sharing, or bypassing API access.
 - Tasks where Codex already has enough local evidence to act.
 - Final authority decisions. Codex must evaluate ChatGPT's response before acting.
 
@@ -99,6 +100,18 @@ Read the response:
 
 ```powershell
 node .\dist\cli.js show --job <job-id>
+```
+
+Check local bridge readiness without sending a prompt:
+
+```powershell
+node .\dist\cli.js doctor
+```
+
+Check browser login and Project reachability without submitting a delegation prompt:
+
+```powershell
+node .\dist\cli.js doctor --adapter playwright
 ```
 
 ## MCP

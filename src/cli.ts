@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { browserProfileDir, ensureStateDirs, jobsDir, readTextFile, responsesDir, writeText } from "./fs.js";
+import { readdir } from "node:fs/promises";
+import { browserProfileDir, configPath, ensureStateDirs, jobsDir, readTextFile, responsesDir, writeText } from "./fs.js";
 import { ManualBridgeAdapter } from "./adapters/manual.js";
-import { PlaywrightBridgeAdapter, debugChatGptPage, debugSubmitPrompt, loginWithPlaywright } from "./adapters/playwright.js";
+import {
+  PlaywrightBridgeAdapter,
+  checkChatGptReady,
+  debugChatGptPage,
+  debugSubmitPrompt,
+  loginWithPlaywright
+} from "./adapters/playwright.js";
 import { readConfig, updateConfig, validateChatGptProjectUrl, writeProjectInstructions } from "./config.js";
 import { createJob } from "./job.js";
 import { formatDelegationResponse, parseDelegationResponse } from "./response.js";
@@ -142,11 +149,79 @@ async function commandShow(args: Args): Promise<void> {
   console.log(await readTextFile(responsePath));
 }
 
+async function commandDoctor(args: Args): Promise<void> {
+  let failed = false;
+  const report = (ok: boolean, label: string, detail?: string) => {
+    failed = failed || !ok;
+    console.log(`${ok ? "[ok]" : "[fail]"} ${label}${detail ? `: ${detail}` : ""}`);
+  };
+  const warn = (label: string, detail?: string) => {
+    console.log(`[warn] ${label}${detail ? `: ${detail}` : ""}`);
+  };
+
+  const config = await readConfig();
+  report(existsSync(browserProfileDir), "Browser profile path exists", browserProfileDir);
+  if (existsSync(configPath)) {
+    report(true, "Config file exists", configPath);
+  } else {
+    warn("Config file not found", "run project-set to target a dedicated ChatGPT Project");
+  }
+
+  if (config.projectUrl) {
+    try {
+      validateChatGptProjectUrl(config.projectUrl);
+      report(true, "Project URL configured", config.projectUrl);
+    } catch (error: unknown) {
+      report(false, "Project URL configured", error instanceof Error ? error.message : String(error));
+    }
+  } else if (config.projectName) {
+    report(true, "Project name configured", config.projectName);
+    warn("Project name targeting is less stable than URL targeting");
+  } else {
+    warn("Project target not configured", "ask still works, but messages may go to a normal chat");
+  }
+
+  try {
+    parseDelegationResponse("verdict: proceed\n\nsummary:\n- schema validation works\n");
+    report(true, "Schema validation works");
+  } catch (error: unknown) {
+    report(false, "Schema validation works", error instanceof Error ? error.message : String(error));
+  }
+
+  report(!boolArg(args, "unsafe-debug"), "Debug mode disabled", boolArg(args, "unsafe-debug") ? "do not use doctor with --unsafe-debug" : undefined);
+
+  if (adapterName(args) === "playwright") {
+    try {
+      const result = await checkChatGptReady({
+        channel: textArg(args, "channel"),
+        headless: boolArg(args, "headless"),
+        timeoutMs: numberArg(args, "timeout-ms", 120_000),
+        projectUrl: await resolveProjectUrl(args),
+        projectName: await resolveProjectName(args)
+      });
+      report(true, "ChatGPT session logged in", result.title || "(title unavailable)");
+      report(true, "Project page reachable", result.url);
+    } catch (error: unknown) {
+      report(false, "ChatGPT browser check", error instanceof Error ? error.message : String(error));
+    }
+  } else {
+    warn("ChatGPT browser check skipped", "run doctor --adapter playwright to verify login and Project reachability");
+  }
+
+  if (existsSync(jobsDir)) {
+    const jobCount = (await readdir(jobsDir).catch(() => [])).length;
+    warn("Local job files", `${jobCount} file(s) under ${jobsDir}, ignored by git`);
+  }
+
+  if (failed) process.exitCode = 1;
+}
+
 function printHelp(): void {
   console.log(`cgpt commands:
   login [--channel chrome|msedge] [--project-url <url>] [--timeout-ms <number>]
   project-set (--url <chatgpt-project-url>|--name <project-name>)
   project-instructions [--out <path>]
+  doctor [--adapter manual|playwright] [--channel chrome|msedge] [--timeout-ms <number>]
   profile-path
   debug-page --unsafe-debug [--channel chrome|msedge] [--project-url <url>] [--timeout-ms <number>]
   debug-submit --unsafe-debug --text <text> [--channel chrome|msedge]
@@ -188,6 +263,7 @@ async function main(): Promise<void> {
     console.log(`wrote: ${out}`);
     return;
   }
+  if (command === "doctor") return commandDoctor(args);
   if (command === "profile-path") {
     console.log(browserProfileDir);
     return;
