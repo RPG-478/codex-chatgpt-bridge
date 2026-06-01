@@ -5,6 +5,8 @@
 [![Node](https://img.shields.io/badge/node-%3E%3D22-339933)](./package.json)
 [![Adapter](https://img.shields.io/badge/adapter-Playwright-2EAD33)](#adapters)
 
+**Languages:** English | [日本語](./README.ja.md)
+
 Local-first PoC for letting Codex delegate compact tasks to ChatGPT Web.
 
 ```text
