@@ -43,18 +43,26 @@ Codex is strong at acting on the local machine: reading files, editing, running 
 
 The goal is to reduce Codex context usage for compact second opinions without giving ChatGPT control over your machine.
 
-## Features
+## Current Capabilities
 
-| Feature | Current state |
+| Capability | Current state |
 | --- | --- |
-| Manual delegation | Implemented |
-| Playwright ChatGPT Web adapter | Implemented |
-| Dedicated ChatGPT Project targeting | Implemented |
-| Project instructions template | Implemented |
+| Manual prompt-packet workflow | Implemented |
+| Playwright ChatGPT Web delegation | Implemented |
+| Dedicated ChatGPT Project targeting | Implemented by URL, with name fallback |
+| ChatGPT Project instructions template | Implemented |
 | Structured response validation | Implemented |
-| MCP server wrapper | Implemented |
-| Local doctor checks | Implemented |
-| Chrome extension adapter | Planned |
+| Local `doctor` checks | Implemented |
+| Optional Playwright `doctor` reachability check | Implemented |
+| stdio MCP wrapper | Implemented for delegation and project instructions |
+
+## Current Limitations
+
+- ChatGPT Web automation depends on the current web UI and can break without a code change in this project.
+- Project targeting is verified before Playwright delegation and by `doctor --adapter playwright`, but there is not yet a separate post-submit Project membership smoke test.
+- Invalid ChatGPT response schemas currently fail fast; automatic repair retry is not implemented yet.
+- Context packets are not automatically redacted yet. Keep delegated context small and exclude secrets manually.
+- There is no Chrome extension adapter yet; Playwright is the only automated browser adapter.
 
 ## Install
 
@@ -274,6 +282,6 @@ npm test
 ## Roadmap
 
 - Chrome extension adapter for more stable DOM integration.
-- Project membership smoke test after each delegation.
+- Post-submit Project membership smoke test after each Playwright delegation.
 - Retry-on-schema-failure with a repair prompt.
 - Redaction helpers for context packets.

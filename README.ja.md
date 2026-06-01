@@ -43,18 +43,26 @@ Codex はローカルマシン上での実行に強いです。ファイルを�
 
 目的は、ChatGPT にマシン操作権限を渡さずに、Codex のコンテキスト消費を抑えつつ小さなセカンドオピニオンを得ることです。
 
-## 機能
+## 現在の機能
 
 | 機能 | 現在の状態 |
 | --- | --- |
-| 手動委任 | 実装済み |
-| Playwright ChatGPT Web アダプタ | 実装済み |
-| 専用 ChatGPT Project の指定 | 実装済み |
-| Project instructions テンプレート | 実装済み |
+| 手動プロンプトパケット workflow | 実装済み |
+| Playwright ChatGPT Web 委任 | 実装済み |
+| 専用 ChatGPT Project の指定 | URL 指定を実装済み、名前指定は fallback |
+| ChatGPT Project instructions テンプレート | 実装済み |
 | 構造化レスポンス検証 | 実装済み |
-| MCP server wrapper | 実装済み |
-| ローカル doctor チェック | 実装済み |
-| Chrome extension adapter | 予定 |
+| ローカル `doctor` チェック | 実装済み |
+| 任意の Playwright `doctor` 到達性チェック | 実装済み |
+| stdio MCP wrapper | 委任と Project instructions 用に実装済み |
+
+## 現在の制限
+
+- ChatGPT Web 自動化は現在の Web UI に依存するため、このプロジェクトのコード変更なしに壊れる可能性があります。
+- Project 指定は Playwright 委任前と `doctor --adapter playwright` で検証しますが、送信後に独立して確認する Project 所属 smoke test はまだありません。
+- ChatGPT のレスポンス schema が無効な場合、現状は即失敗します。自動 repair retry は未実装です。
+- context packet の自動 redaction はまだありません。委任する文脈は小さく保ち、secret は手動で除外してください。
+- Chrome extension adapter はまだありません。自動ブラウザ adapter は Playwright のみです。
 
 ## インストール
 
@@ -274,6 +282,6 @@ npm test
 ## ロードマップ
 
 - より安定した DOM 統合のための Chrome extension adapter。
-- 各委任後の Project 所属 smoke test。
+- Playwright 委任ごとの送信後 Project 所属 smoke test。
 - スキーマ失敗時の repair prompt によるリトライ。
 - context packet 用の redaction helper。
