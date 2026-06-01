@@ -5,7 +5,7 @@ description: Delegate compact research, review, planning, debugging, or summariz
 
 # ChatGPT Delegate
 
-Use the local `cgpt` bridge when a task benefits from a second model but Codex should avoid carrying large context or driving the UI directly.
+Use the local `cgpt` bridge or its MCP server when a task benefits from a second model but Codex should avoid carrying large context or driving the UI directly.
 
 Prefer a dedicated ChatGPT Project when available. Projects keep Codex delegation chats, files, instructions, and memory in a focused workspace instead of mixing them into the user's normal ChatGPT chats.
 
@@ -100,6 +100,13 @@ Read the response:
 ```powershell
 node .\dist\cli.js show --job <job-id>
 ```
+
+## MCP
+
+If the MCP server is configured, prefer its tools over shelling out to the CLI:
+
+- `chatgpt_delegate`: create a manual prompt packet or delegate through Playwright.
+- `chatgpt_project_instructions`: return the recommended ChatGPT Project instructions.
 
 ## Modes
 

@@ -1,13 +1,11 @@
 #!/usr/bin/env node
-import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { ensureStateDirs, jobsDir, readTextFile, responsesDir, writeText } from "./fs.js";
 import { ManualBridgeAdapter } from "./adapters/manual.js";
 import { PlaywrightBridgeAdapter, debugChatGptPage, debugSubmitPrompt, loginWithPlaywright } from "./adapters/playwright.js";
 import { readConfig, updateConfig, validateChatGptProjectUrl, writeProjectInstructions } from "./config.js";
-import { outputShapeFor, parseMode } from "./modes.js";
-import { buildPrompt } from "./prompt.js";
+import { createJob } from "./job.js";
 import { formatDelegationResponse, parseDelegationResponse } from "./response.js";
 import type { AdapterName, BridgeAdapter, Job } from "./types.js";
 
@@ -89,22 +87,13 @@ async function readContext(args: Args): Promise<string> {
 }
 
 async function commandAsk(args: Args): Promise<void> {
-  const mode = parseMode(textArg(args, "mode"));
   const question = textArg(args, "question");
   if (!question) throw new Error("Missing --question.");
-
-  const base = {
-    id: randomUUID(),
-    mode,
+  const job = createJob({
+    mode: textArg(args, "mode"),
     question,
-    context: await readContext(args),
-    createdAt: new Date().toISOString(),
-    outputShape: outputShapeFor(mode)
-  };
-  const job: Job = {
-    ...base,
-    prompt: buildPrompt(base)
-  };
+    context: await readContext(args)
+  });
 
   const adapter = await createAdapter(args);
   const result = await adapter.submit(job);

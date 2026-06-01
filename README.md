@@ -1,13 +1,13 @@
 # codex-chatgpt-bridge
 
-[![Status](https://img.shields.io/badge/status-experimental-orange)](#status)
+[![Status](https://img.shields.io/badge/status-alpha-orange)](#status)
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-339933)](./package.json)
 [![Adapter](https://img.shields.io/badge/adapter-Playwright-2EAD33)](#adapters)
 
 **Languages:** English | [日本語](./README.ja.md)
 
-Local-first PoC for letting Codex delegate compact tasks to ChatGPT Web.
+Experimental alpha bridge for letting Codex delegate compact tasks to ChatGPT Web.
 
 ```text
 Codex -> cgpt CLI -> local browser bridge -> ChatGPT Project -> structured response -> Codex
@@ -15,7 +15,7 @@ Codex -> cgpt CLI -> local browser bridge -> ChatGPT Project -> structured respo
 
 ## Status
 
-This is an experimental, unofficial proof of concept.
+This is an experimental, unofficial alpha tool.
 
 It is not affiliated with, endorsed by, or supported by OpenAI. ChatGPT Web automation can break when the web UI changes. Use it for local experimentation only.
 
@@ -46,7 +46,7 @@ Codex is strong at local code work: reading files, editing, running commands, an
 | Dedicated ChatGPT Project targeting | Implemented |
 | Project instructions template | Implemented |
 | Structured response validation | Implemented |
-| MCP server wrapper | Planned |
+| MCP server wrapper | Implemented |
 | Chrome extension adapter | Planned |
 
 ## Install
@@ -182,6 +182,22 @@ If the response does not include a valid `verdict` and at least one `summary` it
 | --- | --- | --- |
 | Manual | `--adapter manual` | Generates a prompt file for copy/paste. |
 | Playwright | `--adapter playwright` | Opens ChatGPT Web using a persistent local browser profile. |
+
+## MCP Server
+
+Build the project and run the stdio MCP server:
+
+```powershell
+npm run build
+node .\dist\mcp.js
+```
+
+The server exposes:
+
+| Tool | Purpose |
+| --- | --- |
+| `chatgpt_delegate` | Create a manual prompt packet or delegate directly through Playwright. |
+| `chatgpt_project_instructions` | Return the recommended ChatGPT Project instructions. |
 
 ## Debugging
 

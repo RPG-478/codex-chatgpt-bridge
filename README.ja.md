@@ -1,13 +1,13 @@
 # codex-chatgpt-bridge
 
-[![Status](https://img.shields.io/badge/status-experimental-orange)](#ステータス)
+[![Status](https://img.shields.io/badge/status-alpha-orange)](#ステータス)
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-339933)](./package.json)
 [![Adapter](https://img.shields.io/badge/adapter-Playwright-2EAD33)](#アダプタ)
 
 **Languages:** [English](./README.md) | 日本語
 
-Codex が小さな相談タスクを ChatGPT Web に委任するための、ローカルファーストな PoC です。
+Codex が小さな相談タスクを ChatGPT Web に委任するための、実験的なalpha版ローカルbridgeです。
 
 ```text
 Codex -> cgpt CLI -> local browser bridge -> ChatGPT Project -> structured response -> Codex
@@ -15,7 +15,7 @@ Codex -> cgpt CLI -> local browser bridge -> ChatGPT Project -> structured respo
 
 ## ステータス
 
-これは実験的な非公式PoCです。
+これは実験的な非公式alphaツールです。
 
 OpenAIによる公式・承認・サポート済みのツールではありません。ChatGPT WebのUI変更で壊れる可能性があります。ローカルでの実験用途として扱ってください。
 
@@ -46,7 +46,7 @@ Codex はローカルコード作業、ファイル編集、コマンド実行�
 | 専用 ChatGPT Project の指定 | 実装済み |
 | Project instructions テンプレート | 実装済み |
 | 構造化レスポンス検証 | 実装済み |
-| MCP server wrapper | 予定 |
+| MCP server wrapper | 実装済み |
 | Chrome extension adapter | 予定 |
 
 ## インストール
@@ -182,6 +182,22 @@ next_action: one concrete sentence
 | --- | --- | --- |
 | Manual | `--adapter manual` | コピー&ペースト用のプロンプトファイルを生成する。 |
 | Playwright | `--adapter playwright` | 永続ローカルブラウザプロファイルで ChatGPT Web を開く。 |
+
+## MCP Server
+
+ビルド後、stdio MCP serverとして起動できます。
+
+```powershell
+npm run build
+node .\dist\mcp.js
+```
+
+公開するtool:
+
+| Tool | 用途 |
+| --- | --- |
+| `chatgpt_delegate` | 手動プロンプトパケット作成、またはPlaywright経由の直接委任。 |
+| `chatgpt_project_instructions` | 推奨 ChatGPT Project instructions を返す。 |
 
 ## デバッグ
 

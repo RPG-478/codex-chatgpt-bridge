@@ -153,6 +153,7 @@ async function openChatGpt(context: BrowserContext, options: PlaywrightOptions =
   if (!options.projectUrl && options.projectName) {
     await openProjectByName(page, options.projectName, timeoutMs);
   }
+  await verifyProjectTarget(page, options, timeoutMs);
   return page;
 }
 
@@ -164,6 +165,27 @@ async function openProjectByName(page: Page, projectName: string, timeoutMs: num
 
   await projectTarget.click({ timeout: timeoutMs });
   await waitForPromptEditor(page, timeoutMs);
+}
+
+async function verifyProjectTarget(page: Page, options: PlaywrightOptions, timeoutMs: number): Promise<void> {
+  if (options.projectUrl) {
+    const expected = new URL(options.projectUrl);
+    const actual = new URL(page.url());
+    if (!actual.pathname.includes("project")) {
+      throw new Error(`Expected ChatGPT Project page, got: ${page.url()}`);
+    }
+    if (actual.pathname !== expected.pathname) {
+      throw new Error(`Project URL mismatch. Expected ${expected.pathname}, got ${actual.pathname}.`);
+    }
+  }
+
+  if (options.projectName) {
+    const heading = page
+      .locator("main")
+      .getByText(new RegExp(`^\\s*${escapeRegex(options.projectName)}\\s*$`))
+      .first();
+    await heading.waitFor({ state: "visible", timeout: Math.min(timeoutMs, 15_000) });
+  }
 }
 
 function escapeRegex(value: string): string {

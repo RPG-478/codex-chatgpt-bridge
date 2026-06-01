@@ -1,7 +1,7 @@
 {
   "name": "codex-chatgpt-bridge",
   "version": "0.1.0",
-  "description": "Local-first PoC bridge for letting Codex delegate compact tasks to ChatGPT Web.",
+  "description": "Experimental local bridge for letting Codex delegate compact tasks to ChatGPT Web.",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -19,7 +19,8 @@
     "LICENSE"
   ],
   "bin": {
-    "cgpt": "./dist/cli.js"
+    "cgpt": "./dist/cli.js",
+    "cgpt-mcp": "./dist/mcp.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -35,6 +36,7 @@
     "typescript": "^5.8.0"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "playwright-core": "^1.60.0"
   }
 }
