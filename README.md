@@ -210,6 +210,18 @@ node .\dist\cli.js debug-submit --unsafe-debug --text "hello"
 
 Use these only in a private local environment.
 
+Show the active browser profile path:
+
+```powershell
+node .\dist\cli.js profile-path
+```
+
+If ChatGPT appears to "forget" login, first check that `cgpt`, `cgpt-mcp`, and any manually opened browser window are using the same profile directory. The default is:
+
+```text
+~/.codex-chatgpt-bridge/browser-profile
+```
+
 ## Codex Skill
 
 The included skill lives at:

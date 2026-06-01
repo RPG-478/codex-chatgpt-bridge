@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { ensureStateDirs, jobsDir, readTextFile, responsesDir, writeText } from "./fs.js";
+import { browserProfileDir, ensureStateDirs, jobsDir, readTextFile, responsesDir, writeText } from "./fs.js";
 import { ManualBridgeAdapter } from "./adapters/manual.js";
 import { PlaywrightBridgeAdapter, debugChatGptPage, debugSubmitPrompt, loginWithPlaywright } from "./adapters/playwright.js";
 import { readConfig, updateConfig, validateChatGptProjectUrl, writeProjectInstructions } from "./config.js";
@@ -147,6 +147,7 @@ function printHelp(): void {
   login [--channel chrome|msedge] [--project-url <url>] [--timeout-ms <number>]
   project-set (--url <chatgpt-project-url>|--name <project-name>)
   project-instructions [--out <path>]
+  profile-path
   debug-page --unsafe-debug [--channel chrome|msedge] [--project-url <url>] [--timeout-ms <number>]
   debug-submit --unsafe-debug --text <text> [--channel chrome|msedge]
   ask  --mode <ask|research|review|debug|plan|summarize> --question <text> [--context <text>|--context-file <path>] [--adapter manual|playwright] [--project-url <url>|--project-name <name>]
@@ -185,6 +186,10 @@ async function main(): Promise<void> {
     await ensureStateDirs();
     await writeProjectInstructions(out);
     console.log(`wrote: ${out}`);
+    return;
+  }
+  if (command === "profile-path") {
+    console.log(browserProfileDir);
     return;
   }
   if (command === "debug-page") {

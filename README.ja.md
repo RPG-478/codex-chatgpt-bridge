@@ -210,6 +210,18 @@ node .\dist\cli.js debug-submit --unsafe-debug --text "hello"
 
 privateなローカル環境でのみ使用してください。
 
+現在使っているブラウザプロファイルパスを表示できます。
+
+```powershell
+node .\dist\cli.js profile-path
+```
+
+ChatGPTのログインが「消えた」ように見える場合は、まず `cgpt`、`cgpt-mcp`、手動で開いたブラウザが同じプロファイルディレクトリを使っているか確認してください。デフォルトは以下です。
+
+```text
+~/.codex-chatgpt-bridge/browser-profile
+```
+
 ## Codex Skill
 
 同梱Skillは以下にあります。
