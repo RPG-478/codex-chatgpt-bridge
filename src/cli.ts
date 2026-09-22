@@ -47,6 +47,13 @@ function boolArg(args: Args, name: string): boolean {
   return args[name] === true || args[name] === "true";
 }
 
+function browserBoolArg(args: Args, name: "headless" | "minimized"): boolean {
+  if (!(name in args)) return false;
+  if (args[name] === true || args[name] === "true") return true;
+  if (args[name] === "false") return false;
+  throw new Error(`--${name} expects true or false.`);
+}
+
 function numberArg(args: Args, name: string, fallback: number): number {
   const value = textArg(args, name);
   if (!value) return fallback;
@@ -72,11 +79,23 @@ async function resolveProjectName(args: Args): Promise<string | undefined> {
 }
 
 async function createAdapter(args: Args): Promise<BridgeAdapter> {
+  if ("model" in args && !textArg(args, "model")?.trim()) throw new Error("--model requires an explicit non-empty UI label.");
+  const power = "power" in args ? Number(textArg(args, "power")) : undefined;
+  if (power !== undefined && (!textArg(args, "model") || !Number.isInteger(power) || power < 1 || power > 5)) throw new Error("--power requires an explicit --model and an integer from 1 to 5.");
   const adapter = adapterName(args);
-  if (adapter === "manual") return new ManualBridgeAdapter();
+  const headless = browserBoolArg(args, "headless");
+  const minimized = "minimized" in args ? browserBoolArg(args, "minimized") : undefined;
+  if (minimized && headless) throw new Error("Use --minimized without --headless true.");
+  if (adapter === "manual") {
+    if ("model" in args || "power" in args || "headless" in args || "minimized" in args) throw new Error("Browser options require --adapter playwright.");
+    return new ManualBridgeAdapter();
+  }
   return new PlaywrightBridgeAdapter({
     channel: textArg(args, "channel"),
-    headless: boolArg(args, "headless"),
+    headless: minimized ? false : headless,
+    minimized,
+    model: textArg(args, "model"),
+    power,
     timeoutMs: numberArg(args, "timeout-ms", 180_000),
     projectUrl: await resolveProjectUrl(args),
     projectName: await resolveProjectName(args),
@@ -108,6 +127,9 @@ async function commandAsk(args: Args): Promise<void> {
   console.log(`job: ${result.jobId}`);
   console.log(`prompt: ${path.join(jobsDir, `${job.id}.prompt.md`)}`);
   if (result.status === "done") {
+    console.log(`model: ${result.verifiedModel ?? "browser default (not verified)"}`);
+    if (result.modelDisplay) console.log(`model_display: ${result.modelDisplay}`);
+    if (result.power !== undefined) console.log(`power: ${result.power} (${result.powerLabel})`);
     console.log(`response: ${result.responsePath}`);
     return;
   }
@@ -194,7 +216,7 @@ async function commandDoctor(args: Args): Promise<void> {
     try {
       const result = await checkChatGptReady({
         channel: textArg(args, "channel"),
-        headless: boolArg(args, "headless"),
+        headless: browserBoolArg(args, "headless"),
         timeoutMs: numberArg(args, "timeout-ms", 120_000),
         projectUrl: await resolveProjectUrl(args),
         projectName: await resolveProjectName(args)
@@ -217,6 +239,8 @@ async function commandDoctor(args: Args): Promise<void> {
 }
 
 function printHelp(): void {
+  console.log("ask --model <visible-label> [--power 1..5]: select an available Power level from lowest to highest. Availability and labels depend on the current UI.");
+  console.log("Playwright defaults to normal Chrome minimized. Use ask --minimized false for a visible window or --headless true for experimental headless. Login always uses a visible browser.");
   console.log(`cgpt commands:
   login [--channel chrome|msedge] [--project-url <url>] [--timeout-ms <number>]
   project-set (--url <chatgpt-project-url>|--name <project-name>)
@@ -235,7 +259,7 @@ async function main(): Promise<void> {
   if (command === "login") {
     return loginWithPlaywright({
       channel: textArg(args, "channel"),
-      headless: boolArg(args, "headless"),
+      headless: browserBoolArg(args, "headless"),
       timeoutMs: numberArg(args, "timeout-ms", 10 * 60 * 1000),
       projectUrl: await resolveProjectUrl(args),
       projectName: await resolveProjectName(args)
@@ -271,7 +295,7 @@ async function main(): Promise<void> {
   if (command === "debug-page") {
     return debugChatGptPage({
       channel: textArg(args, "channel"),
-      headless: boolArg(args, "headless"),
+      headless: browserBoolArg(args, "headless"),
       timeoutMs: numberArg(args, "timeout-ms", 120_000),
       projectUrl: await resolveProjectUrl(args),
       projectName: await resolveProjectName(args),
@@ -281,7 +305,7 @@ async function main(): Promise<void> {
   if (command === "debug-submit") {
     return debugSubmitPrompt(textArg(args, "text") ?? "hello", {
       channel: textArg(args, "channel"),
-      headless: boolArg(args, "headless"),
+      headless: browserBoolArg(args, "headless"),
       timeoutMs: numberArg(args, "timeout-ms", 120_000),
       unsafeDebug: boolArg(args, "unsafe-debug")
     });

@@ -49,6 +49,8 @@ The goal is to reduce Codex context usage for compact second opinions without gi
 | --- | --- |
 | Manual prompt-packet workflow | Implemented |
 | Playwright ChatGPT Web delegation | Implemented |
+| Explicit model selection | Verified against the web menu before and after a request |
+| Background browser operation | Minimized Chrome by default; optional headless mode |
 | Dedicated ChatGPT Project targeting | Implemented by URL, with name fallback |
 | ChatGPT Project instructions template | Implemented |
 | Structured response validation | Implemented |
@@ -63,6 +65,8 @@ The goal is to reduce Codex context usage for compact second opinions without gi
 - Invalid ChatGPT response schemas currently fail fast; automatic repair retry is not implemented yet.
 - Context packets are not automatically redacted yet. Keep delegated context small and exclude secrets manually.
 - There is no Chrome extension adapter yet; Playwright is the only automated browser adapter.
+- Model selection depends on the web menu and requires the exact visible model label. Labels and available options vary by account and UI locale. It verifies the UI selection, not the backend model identity.
+- Headless mode may be blocked by ChatGPT verification. Minimized Chrome has been tested on Windows; other platforms and browser channels may behave differently.
 
 ## Install
 
@@ -79,7 +83,7 @@ Requirements:
 
 ## First Login
 
-Use a dedicated browser profile for the bridge:
+Use a dedicated browser profile for the bridge. Login always opens a visible window; complete any sign-in or verification manually:
 
 ```powershell
 node .\dist\cli.js login --channel chrome
@@ -159,6 +163,52 @@ Read a response:
 node .\dist\cli.js show --job <job-id>
 ```
 
+### Select a model
+
+Use the exact label shown in ChatGPT's model menu:
+
+```powershell
+node .\dist\cli.js ask --adapter playwright --model "GPT-5.6 Sol" --question "Summarize the main tradeoffs in this design."
+```
+
+The bridge checks the selected menu item before submitting and again after receiving the response. It fails if the requested model is unavailable or cannot be verified; it never substitutes another model. `Auto` is not supported.
+
+You can use `--model Latest` to select ChatGPT's latest model option. It is a dynamic label, not a fixed model version. The result reports both the requested menu option (`model: Latest`) and the selector's display text (for example, `model_display: 6 Pro`). The display text must remain the same before and after the request. This records the UI state for that run; it does not establish a permanent mapping or independently identify the backend model.
+
+For a model that exposes the Power control, `--power` selects a one-based level from lowest to highest. The number of levels and their labels vary by account and UI locale; the requested level must exist in the current control. A five-level English interface uses:
+
+| Value | Level |
+| --- | --- |
+| 1 | Instant |
+| 2 | Medium |
+| 3 | High |
+| 4 | Extra High |
+| 5 | Pro |
+
+```powershell
+node .\dist\cli.js ask --adapter playwright --model "GPT-5.6 Sol" --power 3 --question "Review this plan."
+```
+
+The bridge checks the Power control's value and accessible description before and after submission. An unavailable level or inconsistent UI produces `POWER_UNVERIFIABLE`. `--power` requires an explicit `--model`; omit Power to preserve the current setting. Labels and availability can change with the account or web interface. Choosing a level changes the dedicated profile's current Power setting.
+
+Without `--model`, the browser's default selection is used and reported as unverified. Available labels depend on your account and the current ChatGPT interface.
+
+### Browser window options
+
+Playwright runs normal Chrome minimized by default, using the dedicated profile. No window flags are needed. Only run one command at a time against that profile.
+
+| Option for `ask` | Behavior |
+| --- | --- |
+| No window options | Normal Chrome, minimized |
+| `--minimized false` | Visible browser window |
+| `--headless true` | Experimental operation without a window |
+
+`--minimized true` and `--headless true` cannot be combined. Login always remains visible. A minimized window can briefly appear during startup or when the site requests interaction.
+
+If ChatGPT requires verification, restore the window or run `login` and complete it manually. The bridge stops on verification pages, HTTP errors and rate limits; it does not automatically switch modes or bypass these checks.
+
+A response timeout or a model-verification failure after submission can mean the request already ran. Check the chat before retrying. Partial responses are not reported as completed.
+
 ## Doctor
 
 Run local checks without sending a prompt to ChatGPT:
@@ -230,6 +280,17 @@ The server exposes:
 | `chatgpt_delegate` | Create a manual prompt packet or delegate directly through Playwright. |
 | `chatgpt_project_instructions` | Return the recommended ChatGPT Project instructions. |
 
+The Playwright adapter also accepts these optional fields in `chatgpt_delegate`:
+
+| Field | Default | Purpose |
+| --- | --- | --- |
+| `model` | Browser selection, unverified | Exact web-menu label to select and verify |
+| `power` | Current setting, unchanged | Integer 1–5; requires an explicit `model` |
+| `headless` | `false` | Request experimental headless operation |
+| `minimized` | `true` unless headless | Set `false` for a visible browser |
+
+These browser options require `adapter: "playwright"`. The manual adapter remains the default.
+
 ## Debugging
 
 Debug commands can expose account names, chat titles, project names, and page content. They are gated:
@@ -278,6 +339,8 @@ It tells Codex when to delegate, how to keep context small, and how to treat Cha
 npm run check
 npm test
 ```
+
+Tests include a local model-menu fixture and require Chrome, or Edge selected through `CGPT_BROWSER_CHANNEL=msedge`. They do not sign in to ChatGPT or send prompts.
 
 ## Roadmap
 

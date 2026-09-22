@@ -3,10 +3,16 @@ import { chromium, type BrowserContext, type Locator, type Page } from "playwrig
 import { browserProfileDir, ensureStateDirs, jobsDir, responsesDir, writeJson, writeText } from "../fs.js";
 import { formatDelegationResponse, parseDelegationResponse } from "../response.js";
 import type { BridgeAdapter, BridgeResult, Job } from "../types.js";
+import { verifyModel } from "./model.js";
+import { checkNavigation } from "./navigation.js";
+import { verifyPower } from "./power.js";
 
 type PlaywrightOptions = {
   channel?: string;
   headless?: boolean;
+  minimized?: boolean;
+  model?: string;
+  power?: number;
   timeoutMs?: number;
   projectUrl?: string;
   projectName?: string;
@@ -19,14 +25,28 @@ export class PlaywrightBridgeAdapter implements BridgeAdapter {
   constructor(private readonly options: PlaywrightOptions = {}) {}
 
   async submit(job: Job): Promise<BridgeResult> {
+    if (this.options.power !== undefined && (!this.options.model || !Number.isInteger(this.options.power) || this.options.power < 1 || this.options.power > 5)) {
+      throw new Error("Power requires an explicit model and an integer from 1 to 5.");
+    }
     await ensureStateDirs();
     await persistJob(job);
 
     const context = await launchChatGptContext(this.options);
     try {
       const page = await openChatGpt(context, this.options);
+      let selection = this.options.model ? await verifyModel(page, this.options.model, true) : undefined;
+      const power = this.options.power !== undefined ? await verifyPower(page, this.options.power, true) : undefined;
+      if (power && this.options.model) selection = await verifyModel(page, this.options.model);
       await submitPrompt(page, job.prompt, this.options.timeoutMs);
       const response = await waitForLatestAssistantText(page, this.options.timeoutMs);
+      if (this.options.model) {
+        try {
+          const confirmed = await verifyModel(page, this.options.model);
+          if (confirmed.displayLabel !== selection?.displayLabel) throw new Error("MODEL_UNVERIFIABLE: model display label changed during the request.");
+          if (power) await verifyPower(page, power.level);
+        }
+        catch (error) { throw new Error(`Request was already sent; do not retry automatically. ${error instanceof Error ? error.message : String(error)}`); }
+      }
       const parsed = parseDelegationResponse(response);
       const normalizedResponse = formatDelegationResponse(parsed);
       const responsePath = path.join(responsesDir, `${job.id}.md`);
@@ -36,6 +56,10 @@ export class PlaywrightBridgeAdapter implements BridgeAdapter {
         jobId: job.id,
         status: "done",
         response: normalizedResponse,
+        verifiedModel: this.options.model,
+        modelDisplay: selection?.displayLabel,
+        power: power?.level,
+        powerLabel: power?.label,
         responsePath
       };
     } finally {
@@ -45,8 +69,9 @@ export class PlaywrightBridgeAdapter implements BridgeAdapter {
 }
 
 export async function loginWithPlaywright(options: PlaywrightOptions = {}): Promise<void> {
+  if (options.headless) throw new Error("Login requires a visible browser. Remove --headless.");
   await ensureStateDirs();
-  const context = await launchChatGptContext(options);
+  const context = await launchChatGptContext({ ...options, headless: false, minimized: false });
   try {
     const page = context.pages()[0] ?? (await context.newPage());
     await page.goto(options.projectUrl ?? chatGptUrl, {
@@ -147,20 +172,45 @@ async function persistJob(job: Job): Promise<void> {
 
 async function launchChatGptContext(options: PlaywrightOptions): Promise<BrowserContext> {
   const timeout = options.timeoutMs ?? 120_000;
-  return chromium.launchPersistentContext(browserProfileDir, {
+  if (options.minimized && options.headless) throw new Error("minimized requires a headed browser; omit headless or set it to false.");
+  const headless = options.headless ?? false;
+  const minimized = options.minimized ?? !headless;
+  const context = await chromium.launchPersistentContext(browserProfileDir, {
     channel: options.channel ?? process.env.CGPT_BROWSER_CHANNEL ?? "chrome",
-    headless: options.headless ?? false,
+    headless,
     timeout,
     viewport: { width: 1280, height: 900 },
-    args: ["--disable-blink-features=AutomationControlled"]
+    args: minimized ? ["--start-minimized"] : []
   });
+  if (minimized) {
+    try {
+      const page = context.pages()[0] ?? await context.newPage();
+      const session = await context.newCDPSession(page);
+      const { windowId } = await session.send("Browser.getWindowForTarget");
+      await session.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "minimized" } });
+      const { bounds } = await session.send("Browser.getWindowBounds", { windowId });
+      if (bounds.windowState !== "minimized") throw new Error("Chrome did not confirm the minimized window state.");
+      await session.detach();
+    } catch (error) { await context.close(); throw error; }
+  }
+  return context;
 }
 
 async function openChatGpt(context: BrowserContext, options: PlaywrightOptions = {}): Promise<Page> {
   const timeoutMs = options.timeoutMs ?? 120_000;
   const page = context.pages()[0] ?? (await context.newPage());
-  await page.goto(options.projectUrl ?? chatGptUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-  await waitForPromptEditor(page, timeoutMs);
+  const navigation = await page.goto(options.projectUrl ?? chatGptUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+  checkNavigation(navigation?.status(), await page.title(), options.headless ?? false);
+  try { await waitForPromptEditor(page, timeoutMs); }
+  catch {
+    // Verification and login screens can appear after the initial navigation
+    // response, so classify the final page state before returning a generic error.
+    checkNavigation(navigation?.status(), await page.title().catch(() => ""), options.headless ?? false);
+    if (await hasLoginCallToAction(page)) {
+      throw new Error("ChatGPT is not logged in. Run: node .\\dist\\cli.js login --channel chrome");
+    }
+    throw new Error(`BROWSER_NOT_READY: ChatGPT editor unavailable${options.headless ? " in headless mode" : ""}. Check login, verification or limits in visible Chrome. No prompt was sent.`);
+  }
   if (await hasLoginCallToAction(page)) {
     throw new Error("ChatGPT is not logged in. Run: node .\\dist\\cli.js login --channel chrome");
   }
@@ -316,8 +366,7 @@ async function waitForLatestAssistantText(page: Page, timeoutMs = 120_000): Prom
     await page.waitForTimeout(1_000);
   }
 
-  if (stableText) return stableText;
-  throw new Error("Timed out waiting for ChatGPT response text.");
+  throw new Error("RESPONSE_TIMEOUT: completion was not confirmed. Check the chat before retrying; the prompt may already have been sent.");
 }
 
 async function extractLatestResponseText(page: Page): Promise<string> {

@@ -21,6 +21,10 @@ export type BridgeResult = {
   status: "pending" | "done";
   responsePath?: string;
   response?: string;
+  verifiedModel?: string;
+  modelDisplay?: string;
+  power?: number;
+  powerLabel?: string;
 };
 
 export interface BridgeAdapter {
