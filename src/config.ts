@@ -17,11 +17,11 @@ export async function updateConfig(next: BridgeConfig): Promise<void> {
 
 export function validateChatGptProjectUrl(url: string): string {
   const parsed = new URL(url);
-  if (parsed.hostname !== "chatgpt.com") {
+  if (parsed.protocol !== "https:" || parsed.hostname !== "chatgpt.com" || parsed.username || parsed.password) {
     throw new Error("Project URL must be on chatgpt.com.");
   }
-  if (!parsed.pathname.includes("project")) {
-    throw new Error("Project URL should look like a ChatGPT project URL.");
+  if (!/^\/g\/g-p-[^/]+\/project\/?$/.test(parsed.pathname)) {
+    throw new Error("Project URL must look like https://chatgpt.com/g/g-p-.../project.");
   }
   return parsed.toString();
 }

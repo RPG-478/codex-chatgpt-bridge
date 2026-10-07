@@ -53,6 +53,15 @@ export function formatDelegationResponse(response: DelegationResponse): string {
   return `${lines.join("\n")}\n`;
 }
 
+export function buildRepairPrompt(originalAnswer: string): string {
+  return [
+    "Reformat your previous answer to satisfy the response contract. Do not add new reasoning or facts.",
+    "Return only the corrected structure: verdict: proceed | revise | blocked; summary: at least one bullet; optional risks:, sources:, and next_action:.",
+    "Original answer:",
+    originalAnswer
+  ].join("\n\n");
+}
+
 function parseSection(text: string, sectionName: string): string[] {
   const section = extractSection(text, sectionName);
   if (!section) return [];

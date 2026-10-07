@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { outputShapeFor, parseMode } from "./modes.js";
 import { buildPrompt } from "./prompt.js";
+import { assertNoSecrets } from "./redaction.js";
 import type { Job, Mode } from "./types.js";
 
 export type CreateJobInput = {
@@ -10,6 +11,7 @@ export type CreateJobInput = {
 };
 
 export function createJob(input: CreateJobInput): Job {
+  assertNoSecrets(input.question, input.context ?? "");
   const mode = parseMode(input.mode);
   const base = {
     id: randomUUID(),
