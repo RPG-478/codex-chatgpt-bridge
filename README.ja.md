@@ -54,6 +54,9 @@ Codex はローカルマシン上での実行に強いです。ファイルを�
 | 専用 ChatGPT Project の指定 | URL 指定を実装済み、名前指定は fallback |
 | ChatGPT Project instructions テンプレート | 実装済み |
 | 構造化レスポンス検証 | 実装済み |
+| 応答形式の修復を1回試行 | Playwright で実装済み |
+| 委任前の秘密情報検出 | 手動・Playwright で実装済み |
+| 応答後の Project URL 確認 | Playwright で実装済み |
 | ローカル `doctor` チェック | 実装済み |
 | 任意の Playwright `doctor` 到達性チェック | 実装済み |
 | stdio MCP wrapper | 委任と Project instructions 用に実装済み |
@@ -61,9 +64,9 @@ Codex はローカルマシン上での実行に強いです。ファイルを�
 ## 現在の制限
 
 - ChatGPT Web 自動化は現在の Web UI に依存するため、このプロジェクトのコード変更なしに壊れる可能性があります。
-- Project 指定は Playwright 委任前と `doctor --adapter playwright` で検証しますが、送信後に独立して確認する Project 所属 smoke test はまだありません。
-- ChatGPT のレスポンス schema が無効な場合、現状は即失敗します。自動 repair retry は未実装です。
-- context packet の自動 redaction はまだありません。委任する文脈は小さく保ち、secret は手動で除外してください。
+- Playwright は設定した Project URL を送信前と各応答後に確認します。名前指定は安定性が低いため、可能なら URL を指定してください。
+- 応答形式が無効な場合、書式修復を1回だけ試みます。元の応答は `.cgpt/responses/<job-id>.original.md` に保存し、修復も失敗した場合はその応答も保存します。
+- question と context にある典型的な秘密情報はジョブ保存・送信前に検出して停止します。検出はベストエフォートなので、識別しにくい秘密や個人情報は送信前に確認してください。
 - Chrome extension adapter はまだありません。自動ブラウザ adapter は Playwright のみです。
 - モデル選択は Web メニューに依存し、画面に表示される正確なモデル名を指定する必要があります。モデル名と選択肢はアカウントや UI locale によって異なります。確認するのは UI 上の選択であり、バックエンドのモデル識別情報ではありません。
 - headless mode は ChatGPT の検証画面に阻止される場合があります。最小化した Chrome は Windows で検証済みですが、ほかの platform や browser channel は未検証です。
@@ -142,7 +145,7 @@ node .\dist\cli.js ask --adapter playwright --mode review --question "List the t
 コマンドごとに Project を指定できます。
 
 ```powershell
-node .\dist\cli.js ask --adapter playwright --project-name "Codex Bridge" --mode plan --question "What should be built next?"
+node .\dist\cli.js ask --adapter playwright --project-url "https://chatgpt.com/g/g-p-.../project" --mode plan --question "What should be built next?"
 ```
 
 手動プロンプトパケットを作成します。
@@ -345,6 +348,3 @@ npm test
 ## ロードマップ
 
 - より安定した DOM 統合のための Chrome extension adapter。
-- Playwright 委任ごとの送信後 Project 所属 smoke test。
-- スキーマ失敗時の repair prompt によるリトライ。
-- context packet 用の redaction helper。

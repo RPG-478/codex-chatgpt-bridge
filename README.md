@@ -54,6 +54,9 @@ The goal is to reduce Codex context usage for compact second opinions without gi
 | Dedicated ChatGPT Project targeting | Implemented by URL, with name fallback |
 | ChatGPT Project instructions template | Implemented |
 | Structured response validation | Implemented |
+| One schema repair attempt | Implemented for Playwright |
+| Secret detection before delegation | Implemented for manual and Playwright |
+| Project URL check after response | Implemented for Playwright |
 | Local `doctor` checks | Implemented |
 | Optional Playwright `doctor` reachability check | Implemented |
 | stdio MCP wrapper | Implemented for delegation and project instructions |
@@ -61,9 +64,9 @@ The goal is to reduce Codex context usage for compact second opinions without gi
 ## Current Limitations
 
 - ChatGPT Web automation depends on the current web UI and can break without a code change in this project.
-- Project targeting is verified before Playwright delegation and by `doctor --adapter playwright`, but there is not yet a separate post-submit Project membership smoke test.
-- Invalid ChatGPT response schemas currently fail fast; automatic repair retry is not implemented yet.
-- Context packets are not automatically redacted yet. Keep delegated context small and exclude secrets manually.
+- Playwright checks the configured Project URL before and after each response. Project-name targeting remains less reliable; use a Project URL when possible.
+- Invalid ChatGPT response schemas trigger one formatting-only repair attempt. The original answer is saved as `.cgpt/responses/<job-id>.original.md`; a failed repair is also saved for inspection.
+- Common high-confidence credentials in the question or context block delegation before the job is saved or sent. Detection is best effort; review context packets for less recognizable secrets and sensitive data.
 - There is no Chrome extension adapter yet; Playwright is the only automated browser adapter.
 - Model selection depends on the web menu and requires the exact visible model label. Labels and available options vary by account and UI locale. It verifies the UI selection, not the backend model identity.
 - Headless mode may be blocked by ChatGPT verification. Minimized Chrome has been tested on Windows; other platforms and browser channels may behave differently.
@@ -139,7 +142,13 @@ Ask through the Playwright adapter:
 node .\dist\cli.js ask --adapter playwright --mode review --question "List the top 3 risks in this bridge design."
 ```
 
-Use a one-off project target:
+Use a one-off project URL (recommended):
+
+```powershell
+node .\dist\cli.js ask --adapter playwright --project-url "https://chatgpt.com/g/g-p-.../project" --mode plan --question "What should be built next?"
+```
+
+Alternatively, target the sidebar name:
 
 ```powershell
 node .\dist\cli.js ask --adapter playwright --project-name "Codex Bridge" --mode plan --question "What should be built next?"
@@ -345,6 +354,3 @@ Tests include a local model-menu fixture and require Chrome, or Edge selected th
 ## Roadmap
 
 - Chrome extension adapter for more stable DOM integration.
-- Post-submit Project membership smoke test after each Playwright delegation.
-- Retry-on-schema-failure with a repair prompt.
-- Redaction helpers for context packets.

@@ -1,7 +1,9 @@
 import path from "node:path";
 import { chromium, type BrowserContext, type Locator, type Page } from "playwright-core";
 import { browserProfileDir, ensureStateDirs, jobsDir, responsesDir, writeJson, writeText } from "../fs.js";
-import { formatDelegationResponse, parseDelegationResponse } from "../response.js";
+import { validateChatGptProjectUrl } from "../config.js";
+import { buildRepairPrompt, formatDelegationResponse, parseDelegationResponse } from "../response.js";
+import { verifyProjectUrl } from "../project.js";
 import type { BridgeAdapter, BridgeResult, Job } from "../types.js";
 import { verifyModel } from "./model.js";
 import { checkNavigation } from "./navigation.js";
@@ -37,8 +39,9 @@ export class PlaywrightBridgeAdapter implements BridgeAdapter {
       let selection = this.options.model ? await verifyModel(page, this.options.model, true) : undefined;
       const power = this.options.power !== undefined ? await verifyPower(page, this.options.power, true) : undefined;
       if (power && this.options.model) selection = await verifyModel(page, this.options.model);
-      await submitPrompt(page, job.prompt, this.options.timeoutMs);
-      const response = await waitForLatestAssistantText(page, this.options.timeoutMs);
+      const firstCount = await submitPrompt(page, job.prompt, this.options.timeoutMs);
+      const response = await waitForLatestAssistantText(page, firstCount, this.options.timeoutMs);
+      await verifyProjectTarget(page, this.options, this.options.timeoutMs ?? 120_000);
       if (this.options.model) {
         try {
           const confirmed = await verifyModel(page, this.options.model);
@@ -47,7 +50,22 @@ export class PlaywrightBridgeAdapter implements BridgeAdapter {
         }
         catch (error) { throw new Error(`Request was already sent; do not retry automatically. ${error instanceof Error ? error.message : String(error)}`); }
       }
-      const parsed = parseDelegationResponse(response);
+      let parsed;
+      try {
+        parsed = parseDelegationResponse(response);
+      } catch (error) {
+        // Keep the first answer for inspection even if the one permitted repair fails.
+        await writeText(path.join(responsesDir, `${job.id}.original.md`), response);
+        const repairCount = await submitPrompt(page, buildRepairPrompt(response), this.options.timeoutMs);
+        const repaired = await waitForLatestAssistantText(page, repairCount, this.options.timeoutMs);
+        await verifyProjectTarget(page, this.options, this.options.timeoutMs ?? 120_000);
+        try {
+          parsed = parseDelegationResponse(repaired);
+        } catch (repairError) {
+          await writeText(path.join(responsesDir, `${job.id}.repair.md`), repaired);
+          throw new Error(`SCHEMA_REPAIR_FAILED: one repair attempt was made. Original and repair answers were saved. ${repairError instanceof Error ? repairError.message : String(repairError)}`);
+        }
+      }
       const normalizedResponse = formatDelegationResponse(parsed);
       const responsePath = path.join(responsesDir, `${job.id}.md`);
       await writeText(responsePath, normalizedResponse);
@@ -199,6 +217,7 @@ async function launchChatGptContext(options: PlaywrightOptions): Promise<Browser
 async function openChatGpt(context: BrowserContext, options: PlaywrightOptions = {}): Promise<Page> {
   const timeoutMs = options.timeoutMs ?? 120_000;
   const page = context.pages()[0] ?? (await context.newPage());
+  if (options.projectUrl) validateChatGptProjectUrl(options.projectUrl);
   const navigation = await page.goto(options.projectUrl ?? chatGptUrl, { waitUntil: "domcontentloaded", timeout: timeoutMs });
   checkNavigation(navigation?.status(), await page.title(), options.headless ?? false);
   try { await waitForPromptEditor(page, timeoutMs); }
@@ -233,14 +252,7 @@ async function openProjectByName(page: Page, projectName: string, timeoutMs: num
 
 async function verifyProjectTarget(page: Page, options: PlaywrightOptions, timeoutMs: number): Promise<void> {
   if (options.projectUrl) {
-    const expected = new URL(options.projectUrl);
-    const actual = new URL(page.url());
-    if (!actual.pathname.includes("project")) {
-      throw new Error(`Expected ChatGPT Project page, got: ${page.url()}`);
-    }
-    if (actual.pathname !== expected.pathname) {
-      throw new Error(`Project URL mismatch. Expected ${expected.pathname}, got ${actual.pathname}.`);
-    }
+    verifyProjectUrl(options.projectUrl, page.url());
   }
 
   if (options.projectName) {
@@ -303,7 +315,7 @@ function promptEditor(page: Page): Locator {
     .first();
 }
 
-async function submitPrompt(page: Page, prompt: string, timeoutMs = 120_000): Promise<void> {
+async function submitPrompt(page: Page, prompt: string, timeoutMs = 120_000): Promise<number> {
   const editor = await waitForPromptEditor(page, timeoutMs);
   const beforeCount = await assistantMessages(page).count();
 
@@ -325,6 +337,7 @@ async function submitPrompt(page: Page, prompt: string, timeoutMs = 120_000): Pr
       { timeout: 10_000 }
     )
     .catch(() => undefined);
+  return beforeCount;
 }
 
 function assistantMessages(page: Page): Locator {
@@ -346,12 +359,16 @@ function findSendButton(page: Page): Locator {
     .first();
 }
 
-async function waitForLatestAssistantText(page: Page, timeoutMs = 120_000): Promise<string> {
+async function waitForLatestAssistantText(page: Page, beforeCount: number, timeoutMs = 120_000): Promise<string> {
   let stableText = "";
   let stableCount = 0;
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
+    if (await assistantMessages(page).count() <= beforeCount) {
+      await page.waitForTimeout(1_000);
+      continue;
+    }
     const text = normalizeResponse(await extractLatestResponseText(page));
     const generating = await isGenerating(page);
 

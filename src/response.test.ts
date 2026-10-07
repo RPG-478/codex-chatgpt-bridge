@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatDelegationResponse, parseDelegationResponse } from "./response.js";
+import { buildRepairPrompt, formatDelegationResponse, parseDelegationResponse } from "./response.js";
 
 test("parses structured delegation response", () => {
   const parsed = parseDelegationResponse(`verdict: revise
@@ -34,4 +34,11 @@ test("rejects response without verdict", () => {
 test("formats normalized response", () => {
   const parsed = parseDelegationResponse("verdict: proceed\n\nsummary:\n- ok\n");
   assert.equal(formatDelegationResponse(parsed), "verdict: proceed\n\nsummary:\n- ok\n");
+});
+
+test("repair prompt keeps the original answer and requests formatting only", () => {
+  const original = "I would revise this plan.";
+  const prompt = buildRepairPrompt(original);
+  assert.match(prompt, /Do not add new reasoning or facts/);
+  assert.match(prompt, /I would revise this plan/);
 });
